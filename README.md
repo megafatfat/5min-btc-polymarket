@@ -26,7 +26,7 @@ This is a momentum-following approach, not a reversal strategy.
 ### Prerequisites
 - OpenClaw environment
 - Polymarket execution stack available at:
-  - `/Users/evgenianosko/.openclaw/workspace/pm-hl-conservative-plus-repo`
+  - `<your-workspace>/pm-hl-conservative-plus-repo`
 - Python virtual env for runner scripts
 - Valid API credentials configured outside this repository
 
@@ -42,12 +42,33 @@ Read:
 
 Run a conservative real test (example):
 ```bash
-.venv/bin/python /Users/evgenianosko/.openclaw/workspace/skills/btc-5m-live/scripts/test_btc_5m_session_exit_sl.py --profile conservative --execute
+.venv/bin/python scripts/test_btc_5m_session_exit_sl.py --profile conservative --execute
 ```
 
 Run aggressive profile:
 ```bash
-.venv/bin/python /Users/evgenianosko/.openclaw/workspace/skills/btc-5m-live/scripts/test_btc_5m_session_exit_sl.py --profile aggressive --execute
+.venv/bin/python scripts/test_btc_5m_session_exit_sl.py --profile aggressive --execute
+```
+
+Unified skill control (recommended):
+```bash
+scripts/btc5m_ctl.sh start --profile conservative
+scripts/btc5m_ctl.sh status
+scripts/btc5m_ctl.sh report --limit 20
+scripts/btc5m_ctl.sh stop
+```
+
+Runtime isolation:
+- skill runtime dir: `./runtime`
+- auth/env source (default): `<your-workspace>/pm-hl-conservative-plus-repo/.env`
+- overrides: `BTC5M_REPO`, `BTC5M_ENV_FILE`, `BTC5M_RUNNER`
+- completion auto-report cron (topic 184): `btc5m-completion-autoreport-topic184`
+
+Optional Docker isolation:
+```bash
+scripts/btc5m_docker.sh up
+scripts/btc5m_docker.sh status
+scripts/btc5m_docker.sh down
 ```
 
 ## Execution Checklist (Before Live Trade)

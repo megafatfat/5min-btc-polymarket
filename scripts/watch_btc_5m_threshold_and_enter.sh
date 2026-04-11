@@ -1,8 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REPO="/Users/evgenianosko/.openclaw/workspace/pm-hl-conservative-plus-repo"
-PY="/Users/evgenianosko/.openclaw/workspace/skills/btc-5m-live/scripts/run_btc_5m_threshold_test.py"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+SKILL_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+WORKSPACE_ROOT="$(cd "$SKILL_ROOT/../.." && pwd)"
+REPO="${BTC5M_REPO:-$WORKSPACE_ROOT/pm-hl-conservative-plus-repo}"
+PY="$SCRIPT_DIR/run_btc_5m_threshold_test.py"  # compatibility wrapper -> canonical runner
 LOG="$REPO/runtime/btc_5m_threshold_watch.log"
 STATE="$REPO/runtime/btc_5m_threshold_watch.state"
 
@@ -24,7 +27,7 @@ while true; do
     exit 0
   fi
 
-  out=$(cd "$REPO" && .venv/bin/python "$PY" --threshold "$THRESHOLD" --stake-usd "$STAKE" --execute 2>&1 || true)
+  out=$(cd "$REPO" && .venv/bin/python "$PY" --profile conservative --threshold "$THRESHOLD" --stake-usd "$STAKE" --entry-timeout-min 8 --poll-sec 2 --execute 2>&1 || true)
   echo "$out" >> "$LOG"
 
   # if decision enter and runner returned success/matched -> stop

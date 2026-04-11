@@ -6,6 +6,7 @@ import os
 import subprocess
 import time
 from typing import Any, Optional
+from pathlib import Path
 
 import requests
 
@@ -178,7 +179,15 @@ def run_open(repo: str, slug: str, side: str, stake: float, execute: bool) -> tu
     return out, parse_json_objects(out)
 
 
-def run_close(repo: str, slug: str, token_id: str, shares: float, execute: bool) -> tuple[str, list[dict[str, Any]]]:
+def run_close(
+    repo: str,
+    slug: str,
+    token_id: str,
+    shares: float,
+    execute: bool,
+    close_order_type: str = 'FAK',
+    close_limit_price: float | None = None,
+) -> tuple[str, list[dict[str, Any]]]:
     cmd = [
         '.venv/bin/python',
         'src/live/pm_live_trade_runner.py',
@@ -186,10 +195,12 @@ def run_close(repo: str, slug: str, token_id: str, shares: float, execute: bool)
         '--close-token-id', token_id,
         '--close-shares', f'{shares:.8f}',
     ]
+    if close_limit_price is not None and close_limit_price > 0:
+        cmd += ['--close-limit-price', f'{close_limit_price:.6f}']
     if execute:
         cmd.append('--execute')
     env = os.environ.copy()
-    env.setdefault('PM_CLOSE_ORDER_TYPE', 'FAK')
+    env['PM_CLOSE_ORDER_TYPE'] = str(close_order_type or 'FAK').upper()
     p = subprocess.run(cmd, cwd=repo, capture_output=True, text=True, env=env)
     out = (p.stdout or '') + '\n' + (p.stderr or '')
     return out, parse_json_objects(out)
@@ -250,9 +261,16 @@ def apply_profile(args: argparse.Namespace) -> argparse.Namespace:
     return args
 
 
+def default_repo_path() -> str:
+    env_repo = os.environ.get('BTC5M_REPO')
+    if env_repo:
+        return env_repo
+    return str(Path(__file__).resolve().parents[3] / 'pm-hl-conservative-plus-repo')
+
+
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument('--repo', default='/Users/evgenianosko/.openclaw/workspace/pm-hl-conservative-plus-repo')
+    ap.add_argument('--repo', default=default_repo_path())
     ap.add_argument('--profile', choices=['conservative', 'aggressive'], default='conservative')
     ap.add_argument('--threshold', type=float, default=None)
     ap.add_argument('--stake-usd', type=float, default=None)
@@ -261,6 +279,8 @@ def main():
     ap.add_argument('--min-entry-seconds-left', type=int, default=None, help='Do not open if less seconds remain in current 5m slot')
     ap.add_argument('--entry-timeout-min', type=int, default=None)
     ap.add_argument('--poll-sec', type=float, default=None)
+    ap.add_argument('--close-retry-max', type=int, default=18, help='Max close retries when position is not yet visible / not immediately closable')
+    ap.add_argument('--close-retry-delay-sec', type=float, default=2.0, help='Delay between close retries')
     ap.add_argument('--execute', action='store_true')
     args = apply_profile(ap.parse_args())
 
@@ -275,6 +295,8 @@ def main():
             'min_entry_seconds_left': args.min_entry_seconds_left,
             'entry_timeout_min': args.entry_timeout_min,
             'poll_sec': args.poll_sec,
+            'close_retry_max': args.close_retry_max,
+            'close_retry_delay_sec': args.close_retry_delay_sec,
             'execute': args.execute,
         },
         'attempts': [],
@@ -424,13 +446,82 @@ def main():
             break
         time.sleep(args.poll_sec)
 
-    out, objs = run_close(args.repo, opened['market_slug'], opened['token_id'], opened['shares'], args.execute)
-    close_obj = objs[-1] if objs else {}
+    close_debug: list[dict[str, Any]] = []
+    close_obj: dict[str, Any] = {}
+    out = ''
+    fallback_used = None
+
+    for i in range(max(1, int(args.close_retry_max))):
+        out, objs = run_close(
+            args.repo,
+            opened['market_slug'],
+            opened['token_id'],
+            opened['shares'],
+            args.execute,
+            close_order_type='FAK',
+        )
+        close_obj = objs[-1] if objs else {}
+        post = close_obj.get('order_post_result') or {}
+        status = str(post.get('status') or '').lower()
+        skipped = str(close_obj.get('close_skipped') or '')
+        close_debug.append({
+            'ts': ts_utc(),
+            'attempt': i + 1,
+            'order_type': 'FAK',
+            'status': status,
+            'close_skipped': skipped,
+        })
+        if post.get('success') is True and status == 'matched':
+            break
+
+        # common transient path right after open: token balance not yet visible
+        if skipped == 'zero_effective_shares':
+            time.sleep(float(args.close_retry_delay_sec))
+            continue
+
+        # fallback: if FAK has no instant match, try a GTC limit close near current side price
+        txt = ((out or '') + '\n' + json.dumps(close_obj, ensure_ascii=False)).lower()
+        if 'no orders found to match with fak order' in txt:
+            px = get_side_price_from_slug(opened['market_slug'], opened['side'])
+            if px is None:
+                px = report.get('last_side_price')
+            if px is None:
+                px = opened['entry_price']
+            limit_px = max(0.01, min(0.99, float(px)))
+            fallback_used = {'type': 'GTC_LIMIT', 'price': limit_px}
+            out2, objs2 = run_close(
+                args.repo,
+                opened['market_slug'],
+                opened['token_id'],
+                opened['shares'],
+                args.execute,
+                close_order_type='GTC',
+                close_limit_price=limit_px,
+            )
+            close_obj2 = objs2[-1] if objs2 else {}
+            post2 = close_obj2.get('order_post_result') or {}
+            status2 = str(post2.get('status') or '').lower()
+            close_debug.append({
+                'ts': ts_utc(),
+                'attempt': i + 1,
+                'order_type': 'GTC',
+                'status': status2,
+                'close_skipped': str(close_obj2.get('close_skipped') or ''),
+                'limit_price': limit_px,
+            })
+            close_obj = close_obj2
+            out = out2
+            if post2.get('success') is True and status2 in ('matched', 'live'):
+                break
+
+        time.sleep(float(args.close_retry_delay_sec))
+
     post = close_obj.get('order_post_result') or {}
+    post_status = str(post.get('status') or '').lower()
     closed = {
         'close_reason': close_reason,
         'closed_at': ts_utc(),
-        'close_success': bool(post.get('success') is True and str(post.get('status', '')).lower() == 'matched'),
+        'close_success': bool(post.get('success') is True and post_status in ('matched', 'live')),
         'close_status': post.get('status'),
         'close_order_id': post.get('orderID'),
         'close_tx': (post.get('transactionsHashes') or [None])[0],
@@ -438,6 +529,9 @@ def main():
         'close_usdc': float(post.get('takingAmount') or 0),
         'close_skipped': close_obj.get('close_skipped'),
     }
+    report['close_debug'] = close_debug
+    if fallback_used:
+        report['close_fallback'] = fallback_used
     report['close_raw'] = out[-4000:]
     report['closed'] = closed
 

@@ -34,6 +34,18 @@ class HedgeConfig:
         }
 
 
+def with_main_stake(cfg: HedgeConfig, stake_usd: float) -> HedgeConfig:
+    return HedgeConfig(
+        enabled=cfg.enabled,
+        trigger_side_price_gte=cfg.trigger_side_price_gte,
+        trigger_seconds_left_lte=cfg.trigger_seconds_left_lte,
+        hedge_share_of_main_pct=cfg.hedge_share_of_main_pct,
+        hedge_notional_usd_min=cfg.hedge_notional_usd_min,
+        hedge_notional_usd_max=cfg.hedge_notional_usd_max,
+        main_stake_usd=float(stake_usd),
+    )
+
+
 def load_hedge_config(
     config_path: Optional[Path] = None,
     profile: str = "conservative",

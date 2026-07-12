@@ -4,13 +4,23 @@ import datetime as dt
 import json
 import os
 import subprocess
+import sys
 import time
 from typing import Any, Optional
 from pathlib import Path
 
 import requests
 
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+
 from py_clob_client.client import ClobClient
+from src.execution.enhanced_runner import (
+    build_entry_window_config,
+    build_hedge_config,
+    entry_window_skip_attempt,
+    evaluate_position_hedge,
+)
 from py_clob_client.constants import POLYGON
 from py_clob_client.clob_types import ApiCreds
 
@@ -326,7 +336,33 @@ def default_repo_path() -> str:
     env_repo = os.environ.get('BTC5M_REPO')
     if env_repo:
         return env_repo
-    return str(Path(__file__).resolve().parents[3] / 'pm-hl-conservative-plus-repo')
+    return str(Path(__file__).resolve().parents[2] / 'pm-hl-conservative-plus-repo')
+
+
+def parse_open_result(
+    objs: list[dict[str, Any]],
+    *,
+    fallback_token_id: str,
+    fallback_side: str,
+    fallback_price: float,
+) -> Optional[dict[str, Any]]:
+    post = None
+    runner = None
+    for obj in objs:
+        if isinstance(obj, dict) and 'order_post_result' in obj:
+            runner = obj
+            post = obj.get('order_post_result') or {}
+    if not (post and post.get('success') is True and str(post.get('status', '')).lower() == 'matched'):
+        return None
+    return {
+        'token_id': str(runner.get('token_id') or fallback_token_id),
+        'shares': float(post.get('takingAmount') or 0),
+        'cost_usdc': float(post.get('makingAmount') or 0),
+        'entry_price': float(runner.get('entry_price') or fallback_price),
+        'order_id': post.get('orderID'),
+        'tx': (post.get('transactionsHashes') or [None])[0],
+        'side': fallback_side,
+    }
 
 
 def main():
@@ -342,8 +378,13 @@ def main():
     ap.add_argument('--poll-sec', type=float, default=None)
     ap.add_argument('--close-retry-max', type=int, default=18, help='Max close retries when position is not yet visible / not immediately closable')
     ap.add_argument('--close-retry-delay-sec', type=float, default=2.0, help='Delay between close retries')
+    ap.add_argument('--no-entry-window', action='store_true', help='Disable 120s entry window filter')
+    ap.add_argument('--no-hedge', action='store_true', help='Disable extreme skew micro-hedge')
     ap.add_argument('--execute', action='store_true')
     args = apply_profile(ap.parse_args())
+
+    entry_window_cfg = build_entry_window_config(args.profile, args.min_entry_seconds_left)
+    hedge_cfg = build_hedge_config(args.profile, args.stake_usd)
 
     report: dict[str, Any] = {
         'started_at': ts_utc(),
@@ -358,6 +399,10 @@ def main():
             'poll_sec': args.poll_sec,
             'close_retry_max': args.close_retry_max,
             'close_retry_delay_sec': args.close_retry_delay_sec,
+            'entry_window': entry_window_cfg.as_dict(),
+            'hedge': hedge_cfg.as_dict(),
+            'apply_entry_window': not args.no_entry_window,
+            'apply_hedge': not args.no_hedge,
             'execute': args.execute,
         },
         'attempts': [],
@@ -442,29 +487,41 @@ def main():
 
             side, trigger_price = sorted(candidates, key=lambda x: x[1], reverse=True)[0]
 
+            skip_attempt = entry_window_skip_attempt(
+                slug=slug,
+                seconds_left=sec_left,
+                side=side,
+                trigger_price=trigger_price,
+                up_ask=up_ask,
+                down_ask=dn_ask,
+                entry_cfg=entry_window_cfg,
+                apply_entry_window=not args.no_entry_window,
+            )
+            if skip_attempt is not None:
+                skip_attempt['ts'] = ts_utc()
+                report['attempts'].append(skip_attempt)
+                time.sleep(args.poll_sec)
+                continue
+
             out, objs = run_open(args.repo, slug, side, args.stake_usd, args.execute)
-            post = None
-            runner = None
-            for o in objs:
-                if isinstance(o, dict) and 'order_post_result' in o:
-                    runner = o
-                    post = o.get('order_post_result') or {}
-            if post and post.get('success') is True and str(post.get('status', '')).lower() == 'matched':
-                token_id = str(runner.get('token_id') or (up_t if side == 'UP' else dn_t))
-                shares = float(post.get('takingAmount') or 0)
-                cost = float(post.get('makingAmount') or 0)
-                entry_price = float(runner.get('entry_price') or trigger_price)
+            open_fill = parse_open_result(
+                objs,
+                fallback_token_id=(up_t if side == 'UP' else dn_t),
+                fallback_side=side,
+                fallback_price=trigger_price,
+            )
+            if open_fill:
                 opened = {
                     'opened_at': ts_utc(),
                     'market_slug': slug,
                     'market_end_iso': end_iso,
                     'side': side,
-                    'token_id': token_id,
-                    'entry_price': entry_price,
-                    'shares': shares,
-                    'cost_usdc': cost,
-                    'open_order_id': post.get('orderID'),
-                    'open_tx': (post.get('transactionsHashes') or [None])[0],
+                    'token_id': open_fill['token_id'],
+                    'entry_price': open_fill['entry_price'],
+                    'shares': open_fill['shares'],
+                    'cost_usdc': open_fill['cost_usdc'],
+                    'open_order_id': open_fill['order_id'],
+                    'open_tx': open_fill['tx'],
                 }
                 report['open_raw'] = out[-4000:]
                 break
@@ -493,8 +550,11 @@ def main():
     report['stop_loss_price'] = sl_price
 
     close_reason = None
+    hedge_placed = None
+    hedge_checks: list[dict[str, Any]] = []
     while True:
         now = time.time()
+        sec_left = max(0.0, end_ts - now)
         if now >= (end_ts - args.exit_before_sec):
             close_reason = f'time_exit_{args.exit_before_sec}s_before_end'
             break
@@ -505,6 +565,52 @@ def main():
         if side_px is not None and side_px <= sl_price:
             close_reason = f"stop_loss_{int(args.stop_loss_pct * 100)}pct"
             break
+
+        if hedge_placed is None and not args.no_hedge:
+            try:
+                ev = fetch_event(opened['market_slug'])
+                mkts = (ev or {}).get('markets') or []
+                if mkts:
+                    _, _, up_t, dn_t, _, _ = market_side_prices(mkts[0])
+                    up_ask, dn_ask, _ = clob_side_prices(up_t, dn_t)
+                    hedge_eval = evaluate_position_hedge(
+                        seconds_left=sec_left,
+                        up_ask=up_ask,
+                        down_ask=dn_ask,
+                        hedge_cfg=hedge_cfg,
+                        main_side=opened['side'],
+                        apply_hedge=True,
+                    )
+                    hedge_checks.append({'ts': ts_utc(), 'seconds_left': sec_left, **hedge_eval})
+                    report['last_hedge_eval'] = hedge_eval
+                    if hedge_eval.get('hedge_triggered'):
+                        hedge_side = str(hedge_eval['hedge_side'])
+                        hedge_stake = float(hedge_eval['hedge_notional_usd'])
+                        hedge_out, hedge_objs = run_open(
+                            args.repo,
+                            opened['market_slug'],
+                            hedge_side,
+                            hedge_stake,
+                            args.execute,
+                        )
+                        hedge_fill = parse_open_result(
+                            hedge_objs,
+                            fallback_token_id=(up_t if hedge_side == 'UP' else dn_t),
+                            fallback_side=hedge_side,
+                            fallback_price=float(hedge_eval.get('hedge_price') or 0.5),
+                        )
+                        hedge_placed = {
+                            'placed_at': ts_utc(),
+                            'eval': hedge_eval,
+                            'execute': args.execute,
+                            'filled': hedge_fill is not None,
+                            'fill': hedge_fill,
+                            'raw': hedge_out[-2000:],
+                        }
+                        report['hedge_open'] = hedge_placed
+            except Exception as e:
+                hedge_checks.append({'ts': ts_utc(), 'status': 'hedge_check_error', 'error': str(e)})
+
         time.sleep(args.poll_sec)
 
     close_debug: list[dict[str, Any]] = []
@@ -651,6 +757,8 @@ def main():
         'close_usdc': close_usdc,
         'close_skipped': close_obj.get('close_skipped'),
     }
+    if hedge_checks:
+        report['hedge_checks'] = hedge_checks[-20:]
     report['close_debug'] = close_debug
     if fallback_used:
         report['close_fallback'] = fallback_used

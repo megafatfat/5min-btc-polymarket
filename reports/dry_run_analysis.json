@@ -1,0 +1,361 @@
+{
+  "source_log": "/Users/stephen/Projects/pbt-5m-enhanced/reports/dry_run_monitor_session.log",
+  "meta": {
+    "header": "[dry-run] profile=conservative threshold=0.7 min_entry_sec=60 duration_min=8",
+    "footer": "[dry-run] finished signals=28"
+  },
+  "profile": "conservative",
+  "entry_window": {
+    "target_sec": 120,
+    "tolerance_sec": 30,
+    "min_entry_seconds_left": 60,
+    "window_min_sec": 90.0,
+    "window_max_sec": 150.0
+  },
+  "hedge_config": {
+    "enabled": true,
+    "trigger_side_price_gte": 0.95,
+    "trigger_seconds_left_lte": 45,
+    "hedge_share_of_main_pct": 3.0,
+    "hedge_notional_usd_min": 1.0,
+    "hedge_notional_usd_max": 2.0,
+    "main_stake_usd": 5.0
+  },
+  "totals": {
+    "rows_parsed": 89,
+    "status_counts": {
+      "skip_price_below_threshold": 39,
+      "signal_ready": 28,
+      "skip_too_late_to_enter": 20,
+      "no_market": 2
+    },
+    "raw_signals": 28,
+    "allowed_after_entry_window": 6,
+    "in_entry_window": 6,
+    "hedge_ready": 0,
+    "filtered_out": 22
+  },
+  "entry_class_counts": {
+    "skip_outside_entry_window": 9,
+    "skip_too_early_to_enter": 13,
+    "in_entry_window": 6
+  },
+  "top_allowed_entries": [
+    {
+      "ts": "2026-07-11T12:08:04.239579Z",
+      "slug": "btc-updown-5m-1783771500",
+      "seconds_left": 116.18737602233887,
+      "side": "UP",
+      "trigger_price": 0.71,
+      "up_ask": 0.71,
+      "down_ask": 0.3,
+      "entry_allowed": true,
+      "entry_class": "in_entry_window",
+      "hedge": {
+        "enabled": true,
+        "config": {
+          "enabled": true,
+          "trigger_side_price_gte": 0.95,
+          "trigger_seconds_left_lte": 45,
+          "hedge_share_of_main_pct": 3.0,
+          "hedge_notional_usd_min": 1.0,
+          "hedge_notional_usd_max": 2.0,
+          "main_stake_usd": 5.0
+        },
+        "dominant_side": "UP",
+        "dominant_price": 0.71,
+        "main_side": "UP",
+        "hedge_triggered": false,
+        "status": "hedge_not_triggered",
+        "reason": "skew_below_threshold"
+      }
+    },
+    {
+      "ts": "2026-07-11T12:08:09.722712Z",
+      "slug": "btc-updown-5m-1783771500",
+      "seconds_left": 110.6974778175354,
+      "side": "DOWN",
+      "trigger_price": 0.84,
+      "up_ask": 0.17,
+      "down_ask": 0.84,
+      "entry_allowed": true,
+      "entry_class": "in_entry_window",
+      "hedge": {
+        "enabled": true,
+        "config": {
+          "enabled": true,
+          "trigger_side_price_gte": 0.95,
+          "trigger_seconds_left_lte": 45,
+          "hedge_share_of_main_pct": 3.0,
+          "hedge_notional_usd_min": 1.0,
+          "hedge_notional_usd_max": 2.0,
+          "main_stake_usd": 5.0
+        },
+        "dominant_side": "DOWN",
+        "dominant_price": 0.84,
+        "main_side": "DOWN",
+        "hedge_triggered": false,
+        "status": "hedge_not_triggered",
+        "reason": "skew_below_threshold"
+      }
+    },
+    {
+      "ts": "2026-07-11T12:07:47.650970Z",
+      "slug": "btc-updown-5m-1783771500",
+      "seconds_left": 132.7631859779358,
+      "side": "UP",
+      "trigger_price": 0.7,
+      "up_ask": 0.7,
+      "down_ask": 0.31,
+      "entry_allowed": true,
+      "entry_class": "in_entry_window",
+      "hedge": {
+        "enabled": true,
+        "config": {
+          "enabled": true,
+          "trigger_side_price_gte": 0.95,
+          "trigger_seconds_left_lte": 45,
+          "hedge_share_of_main_pct": 3.0,
+          "hedge_notional_usd_min": 1.0,
+          "hedge_notional_usd_max": 2.0,
+          "main_stake_usd": 5.0
+        },
+        "dominant_side": "UP",
+        "dominant_price": 0.7,
+        "main_side": "UP",
+        "hedge_triggered": false,
+        "status": "hedge_not_triggered",
+        "reason": "skew_below_threshold"
+      }
+    },
+    {
+      "ts": "2026-07-11T12:08:15.240523Z",
+      "slug": "btc-updown-5m-1783771500",
+      "seconds_left": 105.2067608833313,
+      "side": "DOWN",
+      "trigger_price": 0.89,
+      "up_ask": 0.12,
+      "down_ask": 0.89,
+      "entry_allowed": true,
+      "entry_class": "in_entry_window",
+      "hedge": {
+        "enabled": true,
+        "config": {
+          "enabled": true,
+          "trigger_side_price_gte": 0.95,
+          "trigger_seconds_left_lte": 45,
+          "hedge_share_of_main_pct": 3.0,
+          "hedge_notional_usd_min": 1.0,
+          "hedge_notional_usd_max": 2.0,
+          "main_stake_usd": 5.0
+        },
+        "dominant_side": "DOWN",
+        "dominant_price": 0.89,
+        "main_side": "DOWN",
+        "hedge_triggered": false,
+        "status": "hedge_not_triggered",
+        "reason": "skew_below_threshold"
+      }
+    },
+    {
+      "ts": "2026-07-11T12:08:20.770758Z",
+      "slug": "btc-updown-5m-1783771500",
+      "seconds_left": 99.69780993461609,
+      "side": "DOWN",
+      "trigger_price": 0.78,
+      "up_ask": 0.24,
+      "down_ask": 0.78,
+      "entry_allowed": true,
+      "entry_class": "in_entry_window",
+      "hedge": {
+        "enabled": true,
+        "config": {
+          "enabled": true,
+          "trigger_side_price_gte": 0.95,
+          "trigger_seconds_left_lte": 45,
+          "hedge_share_of_main_pct": 3.0,
+          "hedge_notional_usd_min": 1.0,
+          "hedge_notional_usd_max": 2.0,
+          "main_stake_usd": 5.0
+        },
+        "dominant_side": "DOWN",
+        "dominant_price": 0.78,
+        "main_side": "DOWN",
+        "hedge_triggered": false,
+        "status": "hedge_not_triggered",
+        "reason": "skew_below_threshold"
+      }
+    },
+    {
+      "ts": "2026-07-11T12:08:26.257086Z",
+      "slug": "btc-updown-5m-1783771500",
+      "seconds_left": 94.15623712539673,
+      "side": "DOWN",
+      "trigger_price": 0.8,
+      "up_ask": 0.21,
+      "down_ask": 0.8,
+      "entry_allowed": true,
+      "entry_class": "in_entry_window",
+      "hedge": {
+        "enabled": true,
+        "config": {
+          "enabled": true,
+          "trigger_side_price_gte": 0.95,
+          "trigger_seconds_left_lte": 45,
+          "hedge_share_of_main_pct": 3.0,
+          "hedge_notional_usd_min": 1.0,
+          "hedge_notional_usd_max": 2.0,
+          "main_stake_usd": 5.0
+        },
+        "dominant_side": "DOWN",
+        "dominant_price": 0.8,
+        "main_side": "DOWN",
+        "hedge_triggered": false,
+        "status": "hedge_not_triggered",
+        "reason": "skew_below_threshold"
+      }
+    }
+  ],
+  "top_hedge_events": [],
+  "cycles": [
+    {
+      "slug": "btc-updown-5m-1783771200",
+      "raw_signals": 3,
+      "allowed_signals": 0,
+      "hedge_hits": 0,
+      "first_allowed": null,
+      "best_allowed_trigger": null,
+      "strongest_raw_trigger": {
+        "ts": "2026-07-11T12:03:49.404979Z",
+        "slug": "btc-updown-5m-1783771200",
+        "seconds_left": 71.16650199890137,
+        "side": "DOWN",
+        "trigger_price": 0.8,
+        "up_ask": 0.31,
+        "down_ask": 0.8,
+        "entry_allowed": false,
+        "entry_class": "skip_outside_entry_window",
+        "hedge": {
+          "enabled": true,
+          "config": {
+            "enabled": true,
+            "trigger_side_price_gte": 0.95,
+            "trigger_seconds_left_lte": 45,
+            "hedge_share_of_main_pct": 3.0,
+            "hedge_notional_usd_min": 1.0,
+            "hedge_notional_usd_max": 2.0,
+            "main_stake_usd": 5.0
+          },
+          "dominant_side": "DOWN",
+          "dominant_price": 0.8,
+          "main_side": "DOWN",
+          "hedge_triggered": false,
+          "status": "hedge_not_triggered",
+          "reason": "skew_below_threshold"
+        }
+      },
+      "reversal": null
+    },
+    {
+      "slug": "btc-updown-5m-1783771500",
+      "raw_signals": 25,
+      "allowed_signals": 6,
+      "hedge_hits": 0,
+      "first_allowed": {
+        "ts": "2026-07-11T12:07:47.650970Z",
+        "slug": "btc-updown-5m-1783771500",
+        "seconds_left": 132.7631859779358,
+        "side": "UP",
+        "trigger_price": 0.7,
+        "up_ask": 0.7,
+        "down_ask": 0.31,
+        "entry_allowed": true,
+        "entry_class": "in_entry_window",
+        "hedge": {
+          "enabled": true,
+          "config": {
+            "enabled": true,
+            "trigger_side_price_gte": 0.95,
+            "trigger_seconds_left_lte": 45,
+            "hedge_share_of_main_pct": 3.0,
+            "hedge_notional_usd_min": 1.0,
+            "hedge_notional_usd_max": 2.0,
+            "main_stake_usd": 5.0
+          },
+          "dominant_side": "UP",
+          "dominant_price": 0.7,
+          "main_side": "UP",
+          "hedge_triggered": false,
+          "status": "hedge_not_triggered",
+          "reason": "skew_below_threshold"
+        }
+      },
+      "best_allowed_trigger": {
+        "ts": "2026-07-11T12:08:15.240523Z",
+        "slug": "btc-updown-5m-1783771500",
+        "seconds_left": 105.2067608833313,
+        "side": "DOWN",
+        "trigger_price": 0.89,
+        "up_ask": 0.12,
+        "down_ask": 0.89,
+        "entry_allowed": true,
+        "entry_class": "in_entry_window",
+        "hedge": {
+          "enabled": true,
+          "config": {
+            "enabled": true,
+            "trigger_side_price_gte": 0.95,
+            "trigger_seconds_left_lte": 45,
+            "hedge_share_of_main_pct": 3.0,
+            "hedge_notional_usd_min": 1.0,
+            "hedge_notional_usd_max": 2.0,
+            "main_stake_usd": 5.0
+          },
+          "dominant_side": "DOWN",
+          "dominant_price": 0.89,
+          "main_side": "DOWN",
+          "hedge_triggered": false,
+          "status": "hedge_not_triggered",
+          "reason": "skew_below_threshold"
+        }
+      },
+      "strongest_raw_trigger": {
+        "ts": "2026-07-11T12:08:15.240523Z",
+        "slug": "btc-updown-5m-1783771500",
+        "seconds_left": 105.2067608833313,
+        "side": "DOWN",
+        "trigger_price": 0.89,
+        "up_ask": 0.12,
+        "down_ask": 0.89,
+        "entry_allowed": true,
+        "entry_class": "in_entry_window",
+        "hedge": {
+          "enabled": true,
+          "config": {
+            "enabled": true,
+            "trigger_side_price_gte": 0.95,
+            "trigger_seconds_left_lte": 45,
+            "hedge_share_of_main_pct": 3.0,
+            "hedge_notional_usd_min": 1.0,
+            "hedge_notional_usd_max": 2.0,
+            "main_stake_usd": 5.0
+          },
+          "dominant_side": "DOWN",
+          "dominant_price": 0.89,
+          "main_side": "DOWN",
+          "hedge_triggered": false,
+          "status": "hedge_not_triggered",
+          "reason": "skew_below_threshold"
+        }
+      },
+      "reversal": {
+        "from": "UP",
+        "to": "DOWN",
+        "first_ts": "2026-07-11T12:05:29.194319Z",
+        "last_ts": "2026-07-11T12:08:59.333639Z",
+        "first_left_sec": 271.2181179523468,
+        "last_left_sec": 61.1175811290741
+      }
+    }
+  ]
+}

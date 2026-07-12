@@ -13,10 +13,11 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from src.data.market_feed import evaluate_entry_signal
+from src.signal.entry_window import load_entry_window_config
 
 PROFILES = {
-    "conservative": {"threshold": 0.70, "min_entry_seconds_left": 60, "poll_sec": 5.0},
-    "aggressive": {"threshold": 0.70, "min_entry_seconds_left": 60, "poll_sec": 5.0},
+    "conservative": {"threshold": 0.70, "poll_sec": 5.0},
+    "aggressive": {"threshold": 0.70, "poll_sec": 5.0},
 }
 
 
@@ -25,6 +26,9 @@ def main() -> None:
     ap.add_argument("--profile", choices=["conservative", "aggressive"], default="conservative")
     ap.add_argument("--threshold", type=float, default=None)
     ap.add_argument("--min-entry-seconds-left", type=int, default=None)
+    ap.add_argument("--entry-window-target", type=int, default=None)
+    ap.add_argument("--entry-window-tolerance", type=int, default=None)
+    ap.add_argument("--no-entry-window", action="store_true", help="Disable 120s entry window filter")
     ap.add_argument("--poll-sec", type=float, default=None)
     ap.add_argument("--duration-min", type=int, default=5, help="How long to monitor before exiting")
     ap.add_argument("--json", action="store_true", help="Print one JSON object per poll")
@@ -32,24 +36,43 @@ def main() -> None:
 
     prof = PROFILES[args.profile]
     threshold = args.threshold if args.threshold is not None else prof["threshold"]
-    min_entry = (
-        args.min_entry_seconds_left
-        if args.min_entry_seconds_left is not None
-        else prof["min_entry_seconds_left"]
-    )
     poll_sec = args.poll_sec if args.poll_sec is not None else prof["poll_sec"]
+    entry_window = load_entry_window_config(profile=args.profile)
+    if args.min_entry_seconds_left is not None:
+        entry_window = entry_window.__class__(
+            target_sec=entry_window.target_sec,
+            tolerance_sec=entry_window.tolerance_sec,
+            min_entry_seconds_left=args.min_entry_seconds_left,
+        )
+    if args.entry_window_target is not None:
+        entry_window = entry_window.__class__(
+            target_sec=args.entry_window_target,
+            tolerance_sec=entry_window.tolerance_sec,
+            min_entry_seconds_left=entry_window.min_entry_seconds_left,
+        )
+    if args.entry_window_tolerance is not None:
+        entry_window = entry_window.__class__(
+            target_sec=entry_window.target_sec,
+            tolerance_sec=args.entry_window_tolerance,
+            min_entry_seconds_left=entry_window.min_entry_seconds_left,
+        )
 
     deadline = time.time() + max(1, args.duration_min) * 60
     signals = 0
 
     print(
         f"[dry-run] profile={args.profile} threshold={threshold} "
-        f"min_entry_sec={min_entry} duration_min={args.duration_min}",
+        f"entry_window={entry_window.window_min_sec:.0f}-{entry_window.window_max_sec:.0f}s "
+        f"duration_min={args.duration_min}",
         flush=True,
     )
 
     while time.time() < deadline:
-        snap = evaluate_entry_signal(threshold=threshold, min_entry_seconds_left=min_entry)
+        snap = evaluate_entry_signal(
+            threshold=threshold,
+            entry_window=entry_window,
+            apply_entry_window=not args.no_entry_window,
+        )
         if snap.get("status") == "signal_ready":
             signals += 1
 
@@ -62,8 +85,10 @@ def main() -> None:
             up_ask = snap.get("clob_up_ask")
             dn_ask = snap.get("clob_down_ask")
             extra = ""
-            if status == "signal_ready":
+            if snap.get("side"):
                 extra = f" side={snap.get('side')} trigger={snap.get('trigger_price')}"
+                if status != "signal_ready":
+                    extra += f" ({status})"
             print(
                 f"{snap.get('ts')} {status:28} slug={slug} "
                 f"left={sec_left if sec_left is not None else '-'}s "

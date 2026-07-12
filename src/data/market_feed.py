@@ -11,6 +11,8 @@ import requests
 from py_clob_client.client import ClobClient
 from py_clob_client.constants import POLYGON
 
+from src.signal.entry_window import EntryWindowConfig, evaluate_entry_window, load_entry_window_config
+
 UTC = dt.timezone.utc
 GAMMA_BASE = "https://gamma-api.polymarket.com"
 CLOB_BASE = "https://clob.polymarket.com"
@@ -131,8 +133,18 @@ def resolve_active_current_5m_market() -> Optional[dict[str, Any]]:
 
 def evaluate_entry_signal(
     threshold: float,
-    min_entry_seconds_left: int,
+    min_entry_seconds_left: int | None = None,
+    entry_window: EntryWindowConfig | None = None,
+    apply_entry_window: bool = True,
 ) -> dict[str, Any]:
+    window_cfg = entry_window or load_entry_window_config()
+    if min_entry_seconds_left is not None:
+        window_cfg = EntryWindowConfig(
+            target_sec=window_cfg.target_sec,
+            tolerance_sec=window_cfg.tolerance_sec,
+            min_entry_seconds_left=min_entry_seconds_left,
+        )
+
     market = resolve_active_current_5m_market()
     if not market:
         return {"status": "no_market", "ts": dt.datetime.now(UTC).isoformat().replace("+00:00", "Z")}
@@ -140,14 +152,15 @@ def evaluate_entry_signal(
     gamma_up, gamma_dn, up_token, dn_token, slug, end_iso = market_side_prices(market)
     sec_left = float(market.get("_seconds_left") or 0)
 
-    if sec_left < min_entry_seconds_left:
+    if sec_left < window_cfg.min_entry_seconds_left:
         return {
             "status": "skip_too_late_to_enter",
             "slug": slug,
             "seconds_left": sec_left,
-            "min_entry_seconds_left": min_entry_seconds_left,
+            "min_entry_seconds_left": window_cfg.min_entry_seconds_left,
             "gamma_up": gamma_up,
             "gamma_down": gamma_dn,
+            "entry_window": window_cfg.as_dict(),
             "ts": dt.datetime.now(UTC).isoformat().replace("+00:00", "Z"),
         }
 
@@ -177,6 +190,7 @@ def evaluate_entry_signal(
         "clob_down_ask": dn_ask,
         "min_spread": spread,
         "threshold": threshold,
+        "entry_window": window_cfg.as_dict(),
         "ts": dt.datetime.now(UTC).isoformat().replace("+00:00", "Z"),
     }
 
@@ -185,8 +199,17 @@ def evaluate_entry_signal(
         return payload
 
     side, trigger_price = sorted(candidates, key=lambda item: item[1], reverse=True)[0]
-    payload["status"] = "signal_ready"
     payload["side"] = side
     payload["trigger_price"] = trigger_price
+
+    if apply_entry_window:
+        allowed, timing_status, timing_meta = evaluate_entry_window(sec_left, window_cfg)
+        if not allowed:
+            payload["status"] = timing_status
+            payload["window_reason"] = timing_meta.get("reason")
+            payload["dry_run_action"] = "would_open_if_in_window"
+            return payload
+
+    payload["status"] = "signal_ready"
     payload["dry_run_action"] = "would_open"
     return payload

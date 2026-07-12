@@ -11,6 +11,7 @@ import requests
 from py_clob_client.client import ClobClient
 from py_clob_client.constants import POLYGON
 
+from src.risk.skew_hedge import HedgeConfig, evaluate_skew_hedge, load_hedge_config
 from src.signal.entry_window import EntryWindowConfig, evaluate_entry_window, load_entry_window_config
 
 UTC = dt.timezone.utc
@@ -131,13 +132,42 @@ def resolve_active_current_5m_market() -> Optional[dict[str, Any]]:
     return enriched
 
 
+def _attach_hedge(
+    payload: dict[str, Any],
+    *,
+    seconds_left: float,
+    up_ask: Optional[float],
+    down_ask: Optional[float],
+    hedge_cfg: HedgeConfig,
+    apply_hedge: bool,
+    main_side: Optional[str] = None,
+) -> dict[str, Any]:
+    if not apply_hedge:
+        return payload
+    hedge = evaluate_skew_hedge(
+        seconds_left=seconds_left,
+        up_ask=up_ask,
+        down_ask=down_ask,
+        cfg=hedge_cfg,
+        main_side=main_side,
+    )
+    payload["hedge"] = hedge
+    if hedge.get("hedge_triggered"):
+        payload["hedge_action"] = hedge.get("dry_run_action")
+    return payload
+
+
 def evaluate_entry_signal(
     threshold: float,
     min_entry_seconds_left: int | None = None,
     entry_window: EntryWindowConfig | None = None,
     apply_entry_window: bool = True,
+    profile: str = "conservative",
+    hedge_config: HedgeConfig | None = None,
+    apply_hedge: bool = True,
 ) -> dict[str, Any]:
-    window_cfg = entry_window or load_entry_window_config()
+    window_cfg = entry_window or load_entry_window_config(profile=profile)
+    hedge_cfg = hedge_config or load_hedge_config(profile=profile)
     if min_entry_seconds_left is not None:
         window_cfg = EntryWindowConfig(
             target_sec=window_cfg.target_sec,
@@ -153,16 +183,23 @@ def evaluate_entry_signal(
     sec_left = float(market.get("_seconds_left") or 0)
 
     if sec_left < window_cfg.min_entry_seconds_left:
-        return {
-            "status": "skip_too_late_to_enter",
-            "slug": slug,
-            "seconds_left": sec_left,
-            "min_entry_seconds_left": window_cfg.min_entry_seconds_left,
-            "gamma_up": gamma_up,
-            "gamma_down": gamma_dn,
-            "entry_window": window_cfg.as_dict(),
-            "ts": dt.datetime.now(UTC).isoformat().replace("+00:00", "Z"),
-        }
+        return _attach_hedge(
+            {
+                "status": "skip_too_late_to_enter",
+                "slug": slug,
+                "seconds_left": sec_left,
+                "min_entry_seconds_left": window_cfg.min_entry_seconds_left,
+                "gamma_up": gamma_up,
+                "gamma_down": gamma_dn,
+                "entry_window": window_cfg.as_dict(),
+                "ts": dt.datetime.now(UTC).isoformat().replace("+00:00", "Z"),
+            },
+            seconds_left=sec_left,
+            up_ask=None,
+            down_ask=None,
+            hedge_cfg=hedge_cfg,
+            apply_hedge=apply_hedge,
+        )
 
     try:
         up_ask, dn_ask, spread = clob_side_prices(up_token, dn_token)
@@ -196,7 +233,14 @@ def evaluate_entry_signal(
 
     if not candidates:
         payload["status"] = "skip_price_below_threshold"
-        return payload
+        return _attach_hedge(
+            payload,
+            seconds_left=sec_left,
+            up_ask=up_ask,
+            down_ask=dn_ask,
+            hedge_cfg=hedge_cfg,
+            apply_hedge=apply_hedge,
+        )
 
     side, trigger_price = sorted(candidates, key=lambda item: item[1], reverse=True)[0]
     payload["side"] = side
@@ -208,8 +252,24 @@ def evaluate_entry_signal(
             payload["status"] = timing_status
             payload["window_reason"] = timing_meta.get("reason")
             payload["dry_run_action"] = "would_open_if_in_window"
-            return payload
+            return _attach_hedge(
+                payload,
+                seconds_left=sec_left,
+                up_ask=up_ask,
+                down_ask=dn_ask,
+                hedge_cfg=hedge_cfg,
+                apply_hedge=apply_hedge,
+                main_side=side,
+            )
 
     payload["status"] = "signal_ready"
     payload["dry_run_action"] = "would_open"
-    return payload
+    return _attach_hedge(
+        payload,
+        seconds_left=sec_left,
+        up_ask=up_ask,
+        down_ask=dn_ask,
+        hedge_cfg=hedge_cfg,
+        apply_hedge=apply_hedge,
+        main_side=side,
+    )

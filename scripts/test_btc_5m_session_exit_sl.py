@@ -10,9 +10,14 @@ from typing import Any, Optional
 from pathlib import Path
 
 import requests
+from dotenv import load_dotenv
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
+load_dotenv(ROOT / ".env")
+_env_file = os.environ.get("BTC5M_ENV_FILE", "")
+if _env_file:
+    load_dotenv(_env_file, override=False)
 
 from py_clob_client.client import ClobClient
 from src.execution.enhanced_runner import (

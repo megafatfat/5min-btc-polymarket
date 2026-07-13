@@ -189,15 +189,13 @@ def auth_clob_client(clob_base: str = 'https://clob.polymarket.com') -> Optional
         v1 = os.getenv('PM_API_KEY') or ''
         v2 = os.getenv('PM_API_SECRET') or ''
         v3 = os.getenv('PM_API_PASSPHRASE') or ''
-        if not key or not v1 or not v2 or not v3:
+        if not key or key.startswith('your_'):
             return None
         c = ClobClient(host=clob_base, chain_id=POLYGON, key=key, signature_type=sig, funder=funder)
-        creds = {
-            f"api_{'key'}": v1,
-            f"api_{'secret'}": v2,
-            f"api_{'passphrase'}": v3,
-        }
-        c.set_api_creds(ApiCreds(**creds))
+        if v1 and v2 and v3:
+            c.set_api_creds(ApiCreds(api_key=v1, api_secret=v2, api_passphrase=v3))
+        else:
+            c.set_api_creds(c.create_or_derive_api_creds())
         return c
     except Exception:
         return None

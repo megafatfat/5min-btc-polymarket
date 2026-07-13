@@ -1,0 +1,129 @@
+{
+  "config": {
+    "profile": "conservative",
+    "threshold": 0.7,
+    "stake_usd": 5.0,
+    "stop_loss_pct": 0.25,
+    "apply_entry_window": true,
+    "entry_window": {
+      "target_sec": 120,
+      "tolerance_sec": 30,
+      "min_entry_seconds_left": 60,
+      "window_min_sec": 90.0,
+      "window_max_sec": 150.0
+    }
+  },
+  "summary": {
+    "rounds_loaded": 10,
+    "trades": 7,
+    "no_trade": 3,
+    "wins": 4,
+    "losses": 2,
+    "stopped_out": 1,
+    "win_rate": 0.5714,
+    "total_pnl_usd": -10.1515,
+    "avg_pnl_usd": -1.4502
+  },
+  "trades": [
+    {
+      "slug": "btc-updown-5m-1783947300",
+      "status": "no_trade",
+      "side": null,
+      "entry_price": null,
+      "seconds_left": null,
+      "winner": "UP",
+      "pnl_usd": 0.0,
+      "reason": null
+    },
+    {
+      "slug": "btc-updown-5m-1783947600",
+      "status": "stopped_out",
+      "side": "UP",
+      "entry_price": 0.735,
+      "seconds_left": 115.0,
+      "winner": "DOWN",
+      "pnl_usd": -1.25,
+      "reason": "stop_loss_25pct"
+    },
+    {
+      "slug": "btc-updown-5m-1783947900",
+      "status": "loss",
+      "side": "UP",
+      "entry_price": 0.875,
+      "seconds_left": 115.0,
+      "winner": "DOWN",
+      "pnl_usd": -5.0,
+      "reason": "held_to_resolution"
+    },
+    {
+      "slug": "btc-updown-5m-1783948200",
+      "status": "win",
+      "side": "DOWN",
+      "entry_price": 0.935,
+      "seconds_left": 116.0,
+      "winner": "DOWN",
+      "pnl_usd": 0.3476,
+      "reason": "held_to_resolution"
+    },
+    {
+      "slug": "btc-updown-5m-1783948500",
+      "status": "no_trade",
+      "side": null,
+      "entry_price": null,
+      "seconds_left": null,
+      "winner": "DOWN",
+      "pnl_usd": 0.0,
+      "reason": null
+    },
+    {
+      "slug": "btc-updown-5m-1783948800",
+      "status": "no_trade",
+      "side": null,
+      "entry_price": null,
+      "seconds_left": null,
+      "winner": "UP",
+      "pnl_usd": 0.0,
+      "reason": null
+    },
+    {
+      "slug": "btc-updown-5m-1783949100",
+      "status": "loss",
+      "side": "UP",
+      "entry_price": 0.765,
+      "seconds_left": 115.0,
+      "winner": "DOWN",
+      "pnl_usd": -5.0,
+      "reason": "held_to_resolution"
+    },
+    {
+      "slug": "btc-updown-5m-1783949400",
+      "status": "win",
+      "side": "UP",
+      "entry_price": 0.995,
+      "seconds_left": 115.0,
+      "winner": "UP",
+      "pnl_usd": 0.0251,
+      "reason": "held_to_resolution"
+    },
+    {
+      "slug": "btc-updown-5m-1783949700",
+      "status": "win",
+      "side": "DOWN",
+      "entry_price": 0.885,
+      "seconds_left": 116.0,
+      "winner": "DOWN",
+      "pnl_usd": 0.6497,
+      "reason": "held_to_resolution"
+    },
+    {
+      "slug": "btc-updown-5m-1783950000",
+      "status": "win",
+      "side": "DOWN",
+      "entry_price": 0.985,
+      "seconds_left": 115.0,
+      "winner": "DOWN",
+      "pnl_usd": 0.0761,
+      "reason": "held_to_resolution"
+    }
+  ]
+}
